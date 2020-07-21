@@ -6,13 +6,13 @@ Created on Mon Jul 13 20:23:15 2020
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
 import time
 import gym
 
 #%% Initialize arguments and environment
 
-environment = gym.make('FrozenLake-v0')
+#Default environment is such that the frozen lake is slippery (i.e. is_slippery = True)
+environment = gym.make('FrozenLake-v0', is_slippery = True)
 
 nA = environment.nA
 nS = environment.nS
@@ -42,19 +42,28 @@ in Gym that are helpful to know:
 1) P[s][a] 
     - Def: A dictionary that for all states and actions, you have FOUR parameters:
            (probability, nextstate, reward, done). See below for explanation of each.
-    - Probability = Probability that given your current state and action, that you'll end up in the new state.
-                    Based on how the next states are generated, this probability is always 1. 
-                    For example: if we are in state (1,1) and move to the right, there is a 100% chance 
-                    we'll end up at our new state of (1,2). This is also called the nextstate. 
-    - nextstate = The next state that we have ended up in, based on the current state and action performed.
-                  The way that the source code is written, this next state is always true to the prior state
-                  and action. See above example
+    - Probability = Probability that given your current state and directed action, that you'll end up in the expected new state.
+                    Since the default for the environment is that the ice is slippery, there is only a 33% chance
+                    that the agent will end up in the correct spot. More on this in #2 below. 
+    - nextstate = The next state that we have ended up in, based on the current state and actual action performed.
+                  Note that this new state is based off of the actual action, not directed action.
     - Reward = The reward for your agent based on what new state they end up in. 
     - Done = A True/False check to see if your agent has fallen into a hole or hit the goal. 
              Used to signify the end of an episode, and start of a new one.  
    
+2) Probabilities of Movement
+    - When the agent is in a 'F' or 'S' state, there is a 33% chance that the direction the agent goes 
+      is the way you want it to, due to the slippery conditions being True. 
+    - For example: if the best action is to move down, then there is a 33% chance that the agent could move
+      left and a 33% that the agent could move right. 
+    - If the action prescribed is for instance left, there is a zero chance that the agent will go the opposite way, right. 
+    - Below is a breakdown of each direction, and the probabilities of going each way. 
+        - If directed LEFT: 33% chance of going DOWN, 33% chance of going LEFT, 33% chance of going UP
+        - If directed DOWN: 33% chance of going LEFT, 33% chance of going DOWN, 33% chance of going RIGHT
+        - If directed RIGHT: 33% chance of going DOWN, 33% chance of going RIGHT, 33% chance of going UP
 
-2) Actions: The actions and subsequent policy that determine your actions are listed below
+
+3) Actions: The actions and subsequent policy that determine your actions are listed below
     - LEFT = 0
     - DOWN = 1
     - RIGHT = 2
@@ -62,15 +71,20 @@ in Gym that are helpful to know:
     - Policy = a vector of size 1 x number_states. The number in the cell corresponds to 
                 the greedy policy (direction) for that corresponding state.
                
-3) State: The grid of 4x4 or 8x8 is broken up into a 1D vector. The state "number" is
+4) State: The grid of 4x4 or 8x8 is broken up into a 1D vector. The state "number" is
           sequentially added starting top left and ending bottom right. So a 4x4 grid will have
           state numbers from 0 to 15. This nomenclature is used to run a lot of the functions in
           the Gym environment. 
 
-3) Rewards
+5) Rewards
     - STEP_REWARD = 0
     - WIN_REWARD = 1
     - LOSE_REWARD = 0
+    
+6) Slippery Conditions
+    - As mentioned above, the environment defaults to slippery conditions, signifying that 
+      you may not go the direction you want to. 
+    - This can be turned off by appending 'is_slippery = False' to the gym.make command in line 15
            
 
 """
@@ -97,19 +111,23 @@ def policy_evaluation(env, policy, V, gamma, tol, maxiter):
     Output: Optimized state value function for your policy (i.e. v_{pi}(s)). Size is 1 x (nS) vector
     """
     
-    for ii in range(maxiter): 
+    for ii in range(maxiter):
         
-        difference = 0
         policy_val = np.zeros(nS)  #Initialize the new policy value function (i.e. V(s))
         
         for state, action in enumerate(policy):
             for probablity, next_state, reward, info in env.P[state][action]:
-                
                 policy_val[state] += probablity * (reward + (gamma * V[next_state]))
-                difference = max(difference,np.abs(policy_val[state] - V[state]))
-                
-        if difference < tol:
+        
+        #Calculate maximum difference of state value function at each state
+        diff = 0
+        for state in range(int(nS)):
+            diff = max(diff, np.abs(policy_val[state] - V[state]))
+            #print(diff)
+        if diff < tol:
+            #print('tolerance reached after %d cycles' %ii)
             break
+        
         else:
             V = policy_val
         
@@ -137,7 +155,7 @@ def action_value_function(env, state, V , gamma):
             
     return action_val
 
-def policy_update(env, policy, V):
+def policy_update(env, policy, V, gamma):
     
     """
     function to update a given policy based on given value function.
@@ -150,18 +168,19 @@ def policy_update(env, policy, V):
         # choose the action which maximizez the state-action value.
         policy[state] =  np.argmax(action_val)
     
-    print(policy)
+    #print(policy)
     return policy
 
-#Currently copied and pasted from this link: https://github.com/waqasqammar/MDP-with-Value-Iteration-and-Policy-Iteration/blob/master/MDP_with_PI_VI.ipynb
-#I'll want to update this a little bit to make it more of our own
+
+
 def policy_iteration(env, maxiter):
     
     """
-    Steps (to iterate over): 
+    This function is your high level policy iteration function.
+    It goes through the following steps (to iterate over): 
         1) Evaluate your state_value_function, V(s), based on your current policy
         2) Update your policy based on the action_value_function, Q(s,a). 
-        3) Repeat until convergence
+        3) Repeat until the policy has converged
     
         Outputs: Your final state_value_function, V(s), and optimal policy 'pi'
     """
@@ -171,7 +190,7 @@ def policy_iteration(env, maxiter):
     
     # intialize a random policy
     policy = np.random.randint(0, 4, nS)
-    print(policy)
+    #print(policy)
     policy_prev = np.copy(policy)
     
     for i in range(maxiter):
@@ -180,12 +199,12 @@ def policy_iteration(env, maxiter):
         V = policy_evaluation(env, policy, V, gamma, tol, maxiter)
         
         # improve policy
-        policy = policy_update(env, policy, V)
+        policy = policy_update(env, policy, V, gamma)
         
         # if policy not changed over 10 iterations it converged.
         if i % 10 == 0:
             if (np.all(np.equal(policy, policy_prev))):
-                print('policy converged at iteration %d' %(i+1))
+                print('No Changes for 10 iterations. Policy converged at iteration %d' %(i+1))
                 break
             policy_prev = np.copy(policy)
             
@@ -201,67 +220,74 @@ The algorithm is based off of Sutton and Barto's book, page 83.
 """
 
 
-def Optimum_V(env, V, policy, maxiter, gamma, tol):
+def Optimum_V(env, V, maxiter, gamma):
     
     """
     This function finds your optimum state-value function, V(s)
     At each state, calculate the action_value_function, producing a 1x(nA) vector.
     Your new_V(s) is the maximum value over the action_value_function actions 
-    Take the difference with our old V. If its less than some tolerance, then we move forward. 
-    If not, we continue iterating until it is.
+    
+    Output: 
+        - The optimum value function, V(s), a 1x(nS) vector
+        - The maximum difference over all states between the old V(s) and new V(s)
     """
 
-    new_V = np.zeros(nS)
-    for ii in range(maxiter):
-        difference = 0
-        for s in range(nS):
-            action_val = action_value_function(env, s, V, gamma)
-            new_V[s] = np.max(action_val)
-            difference = max(difference, np.abs(V[s] - new_V[s]))
-        if difference < tol:
-            break
-        else: 
-            V = new_V
+    new_V = np.zeros(nS)   
+    difference = 0
+    
+    for s in range(nS):
+        action_val = action_value_function(env, s, V, gamma)
+        new_V[s] = np.max(action_val)
+        difference = max(difference, np.abs(V[s] - new_V[s]))
+
             
-    return new_V
+    return difference, new_V
 
 def value_iteration(env,maxiter):
     
     """
     Just like policy_iteration, this employs a similar approach.
     Steps (to iterate over):
-        1) Find your optimum state_value_function, V(s). 
-        2) Determine the new policy based on this V.
-        3) Rinse repeat.
+        1) Find your optimum state_value_function, V(s).
+        2) Keep iterating until convergence
+        3) Calculate your optimized policy
     
-    Outputs: Your final state_value_function, V(s), and optimal policy 'pi'
+    Outputs: 
+        - Your final state_value_function, V(s) 
+        - Optimal policy 'pi'
     """
     
     # intialize the state-Value function
     V = np.zeros(nS)
     
-    # intialize a random policy
-    policy = np.random.randint(0, 4, nS)
-    print(policy)
-    policy_prev = np.copy(policy)
-    
+    # Iterate over your optimized function, breaking if not changing or difference < tolerance.  
     for i in range(maxiter):
         
+        prev_V = np.copy(V)
+        
         # evaluate given policy
-        V = Optimum_V(env, V, policy, maxiter, gamma, tol)
+        difference, V = Optimum_V(env, prev_V, maxiter, gamma)
         
-        # improve policy
-        policy = policy_update(env, policy, V)
         
-        # if policy not changed over 10 iterations it converged.
+        # if State Value function has not changed over 10 iterations, it has converged.
         if i % 10 == 0:
-            if (np.all(np.equal(policy, policy_prev))):
-                print('policy converged at iteration %d' %(i+1))
+            # if values of 'V' not changing after one iteration
+            if (np.all(np.isclose(V, prev_V))):
+                print('No Changes for 10 iterations. Value converged at iteration %d' %(i+1))
                 break
-            policy_prev = np.copy(policy)
             
+        elif difference < tol:
+            print('Tolerance reached. Value converged at iteration %d' %(i+1))
+            break
+      
+    
+    # Initialize Optimal Policy
+    optimal_policy = np.zeros(nS, dtype = 'int8')
+    
+    # Update your optimal policy based on optimal value function 'V'
+    optimal_policy = policy_update(env, optimal_policy, V, gamma)
 
-    return V, policy   
+    return V, optimal_policy   
         
 
 #%% Run Policy Iteration        
