@@ -89,6 +89,67 @@ in Gym that are helpful to know:
 
 """
 
+#%% Play Episodes
+
+# Code Pulled from https://github.com/waqasqammar/MDP-with-Value-Iteration-and-Policy-Iteration/blob/master/MDP_with_PI_VI.ipynb
+
+def play_episodes(env, n_episodes, policy, random = False):
+    """
+    This fucntion plays the given number of episodes given by following a policy or sample randomly from action_space.
+    
+    Parameters:
+        env: openAI GYM object
+        n_episodes: number of episodes to run
+        policy: Policy to follow while playing an episode
+        random: Flag for taking random actions. if True no policy would be followed and action will be taken randomly
+        
+    Return:
+        wins: Total number of wins playing n_episodes
+        total_reward: Total reward of n_episodes
+        avg_reward: Average reward of n_episodes
+    
+    """
+    # intialize wins and total reward
+    wins = 0
+    total_reward = 0
+    
+    # loop over number of episodes to play
+    for episode in range(n_episodes):
+        
+        # flag to check if the game is finished
+        terminated = False
+        
+        # reset the enviorment every time when playing a new episode
+        state = env.reset()
+        
+        while not terminated:
+            
+            # check if the random flag is not true then follow the given policy other wise take random action
+            if random:
+                action = env.action_space.sample()
+            else:
+                action = policy[state]
+
+            # take the next step
+            next_state, reward,  terminated, info = env.step(action)
+            
+            env.render()
+            
+            # accumalate total reward
+            total_reward += reward
+            
+            # change the state
+            state = next_state
+            
+            # if game is over with positive reward then add 1.0 in wins
+            if terminated and reward == 1.0:
+                wins += 1
+                
+    # calculate average reward
+    average_reward = total_reward / n_episodes
+    
+    return wins, total_reward, average_reward
+
 
 #%% Policy Iteration Algorithm
 
@@ -314,3 +375,7 @@ print('Optimal Value function: ')
 print(opt_V2.reshape((nrow, ncol)))
 print('Final Policy: ')
 print(opt_policy2.reshape(nrow,ncol))
+
+
+n_episode = 100
+wins, total_reward, avg_reward = play_episodes(environment, n_episode, opt_policy2, random = False)
