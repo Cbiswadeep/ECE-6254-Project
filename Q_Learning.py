@@ -31,8 +31,9 @@ viddir_hm = os.path.join(cdir,fn_heatmap)   #directory heatmap video will be sav
 
 #%% GENERATE ENVIRONMENT
 # Environment
-custom_map = ['SFFF','FHFH','FFFH','HFFG']  # added by Jason - standard 4x4 map
-env = gym.make('FrozenLake-v0', is_slippery=False, desc=custom_map)
+##custom_map = ['SFFF','FHFH','FFFH','HFFG']  # added by Jason - standard 4x4 map (uncomment for custom map)
+##env = gym.make('FrozenLake-v0', is_slippery=False, desc=custom_map)
+env = gym.make('FrozenLake8x8-v0')
 print("")
 print('Lake Visualization:')
 print('S=Start, F=Frozen, H=Hole, G=Goal')
@@ -155,10 +156,12 @@ def animateheatmap(j):
 
 #%% TRAIN ROBOT
 # Initialize Q-Table
-#Set inital values of Q table to random values because we know nothing of the real values
+inputCount = env.observation_space.n
+actionsCount = env.action_space.n
+#Set inital values of Q table to zero
 Q = {}
 for i in range(inputCount):
-    Q[i] = np.random.rand(actionsCount)
+    Q[i] = np.zeros(actionsCount)
 
 """
 The parameters listed are as follows:
@@ -183,12 +186,15 @@ The epsilon value starts high to encourage exploration but slowly decays each it
 # Hyperparameters
 lr = 0.33
 lrMin = 0.001
-lrDecay = 0.9999
-gamma = 1.0
+lrDecay = 0.99999
+gamma = 0.9
 epsilon = 1.0
 epsilonMin = 0.001
 epsilonDecay = 0.97
-episodes = 2000
+episodes = 10000
+rewardWin = 100
+rewardLose = -100
+rewardMove = -1
 
 # Variables needed to create visualizations
 epsplot = [epsilon]
@@ -203,7 +209,7 @@ for i in range(episodes):
     s = env.reset()
     done = False
 
-# update list of moves to say it reset - for path movie
+    # update list of moves to say it reset - for path movie
     if i == 0 or (i+1) % vizit == 0 or i == episodes-1:
         if i == 0:
             moves = [-1]
@@ -212,14 +218,26 @@ for i in range(episodes):
             moves.append(-1)
             itnum.append(i+1)
 
-# Iterate the path
+    # Iterate the path
     while not done:
+        #determine if we want to explore or base our action on the Q table
         if np.random.random() < epsilon:
             a = np.random.randint(0, actionsCount)
         else:
             a = np.argmax(Q[s])
-
+        
+        #evaluate the result of the action taken
         newS, r, done, _ = env.step(a)
+        
+        #Manually change the reward structure to negatively reward travel and falling in holes and positvely reward reaching the goal
+        if done and r==0:
+            r = rewardLose
+        elif done and r==1:
+            r = rewardWin
+        else:
+            r = rewardMove
+        
+        #Update the Q table with the Bellman equation
         Q[s][a] = Q[s][a] + lr * (r + gamma * np.max(Q[newS]) - Q[s][a])
         
         #Update moves array with the last move - for path movie
@@ -229,11 +247,13 @@ for i in range(episodes):
 
         # Update s, learning rate, and epsilon
         s = newS
-
+        
+        #decay the learning rate
         if lr > lrMin:
             lr *= lrDecay
 
-        if not r==0 and epsilon > epsilonMin:
+        #decrease exploration rate if we reach the goal
+        if r==rewardWin and epsilon > epsilonMin:
             epsilon *= epsilonDecay
     
     #store epsilon value for epsilon vs iteration plot
@@ -276,7 +296,7 @@ for i in range(100):
 
     avg_r += r/100.
 
-print("Average reward on 100 episodes :", avg_r)
+print("Number of successes out of 100 episodes :", np.round(avg_r*100))
 
 
 #%% CREATE GRAPHICS AND MOVIES
