@@ -12,7 +12,7 @@ import gym
 #%% Initialize arguments and environment
 
 #Default environment is such that the frozen lake is slippery (i.e. is_slippery = True)
-environment = gym.make('FrozenLake-v0', is_slippery = True)
+environment = gym.make('FrozenLake8x8-v0', is_slippery = True)
 
 nA = environment.nA
 nS = environment.nS
@@ -133,7 +133,15 @@ def play_episodes(env, n_episodes, policy, random = False):
             # take the next step
             next_state, reward,  terminated, info = env.step(action)
             
-            env.render()
+            #change the reward structure to negatively reward travel and falling in holes
+#            if terminated and reward == 0:
+#                reward = -10
+#            elif terminated and reward == 1:
+#                reward = 10
+#            else: 
+#                reward = -1
+            
+            #env.render()
             
             # accumalate total reward
             total_reward += reward
@@ -363,6 +371,10 @@ print(opt_V.reshape((nrow, ncol)))
 print('Final Policy: ')
 print(opt_policy.reshape(nrow,ncol))
 
+#n_episode = 100
+#wins_PI, total_reward_PI, avg_reward_PI = play_episodes(environment, n_episode, opt_policy, random = False)
+#print('PI -- Total wins: %d, total reward: %f, Average Reward: %f' %(wins_PI,total_reward_PI,avg_reward_PI))
+
 
 #%% Run Value Iteration
 
@@ -377,5 +389,6 @@ print('Final Policy: ')
 print(opt_policy2.reshape(nrow,ncol))
 
 
-n_episode = 100
-wins, total_reward, avg_reward = play_episodes(environment, n_episode, opt_policy2, random = False)
+#n_episode = 100
+#wins_VI, total_reward_VI, avg_reward_VI = play_episodes(environment, n_episode, opt_policy2, random = False)
+#print('VI -- Total wins: %d, total reward: %f, Average Reward: %f' %(wins_VI,total_reward_VI,avg_reward_VI))
