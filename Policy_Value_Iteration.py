@@ -141,8 +141,6 @@ def play_episodes(env, n_episodes, policy, random = False):
 #            else: 
 #                reward = -1
             
-            #env.render()
-            
             # accumalate total reward
             total_reward += reward
             
