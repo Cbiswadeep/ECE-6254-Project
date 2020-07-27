@@ -31,7 +31,7 @@ viddir_hm = os.path.join(cdir,fn_heatmap)   #directory heatmap video will be sav
 
 #%% GENERATE ENVIRONMENT
 # Environment
-##custom_map = ['SFFF','FHFH','FFFH','HFFG']  # added by Jason - standard 4x4 map (uncomment for custom map)
+custom_map = ['SFFFFFFF', 'FFFFFFFF', 'FFFHFFFF', 'FFFFFHFF', 'FFFHFFFF', 'FHHFFFHF', 'FHFFHFHF', 'FFFHFFFG']  # added by Jason - standard 4x4 map (uncomment for custom map)
 ##env = gym.make('FrozenLake-v0', is_slippery=False, desc=custom_map)
 env = gym.make('FrozenLake8x8-v0')
 print("")
