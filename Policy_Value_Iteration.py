@@ -8,6 +8,7 @@ Created on Mon Jul 13 20:23:15 2020
 import numpy as np
 import time
 import gym
+import matplotlib.pyplot as plt
 
 #%% Initialize arguments and environment
 
@@ -249,7 +250,10 @@ def policy_iteration(env, maxiter):
         2) Update your policy based on the action_value_function, Q(s,a). 
         3) Repeat until the policy has converged
     
-        Outputs: Your final state_value_function, V(s), and optimal policy 'pi'
+        Outputs: 
+            - Your final state_value_function, V(s) 
+            - Optimal policy 'pi'
+            - Average reward based on 100 episodes
     """
     
     # intialize the state-Value function
@@ -260,6 +264,10 @@ def policy_iteration(env, maxiter):
     #print(policy)
     policy_prev = np.copy(policy)
     
+    #Initialize an average reward vector
+    avg_r_PI_mat = []
+    n_episode = 100
+    
     for i in range(maxiter):
         
         # evaluate given policy
@@ -267,6 +275,12 @@ def policy_iteration(env, maxiter):
         
         # improve policy
         policy = policy_update(env, policy, V, gamma)
+        
+        
+        #Play episodes based on the current policy.
+        wins_PI, total_reward_PI, avg_reward_PI = play_episodes(env, n_episode, policy, random = False)
+        avg_r_PI_mat.append(avg_reward_PI)
+        
         
         # if policy not changed over 10 iterations it converged.
         if i % 10 == 0:
@@ -276,7 +290,7 @@ def policy_iteration(env, maxiter):
             policy_prev = np.copy(policy)
             
 
-    return V, policy  
+    return V, policy, avg_r_PI_mat
             
 
 
@@ -322,10 +336,24 @@ def value_iteration(env,maxiter):
     Outputs: 
         - Your final state_value_function, V(s) 
         - Optimal policy 'pi'
+        - Average reward vector (see note below)
+        
+    
+    NOTE: In order to produce the graph showing average reward over each
+          iteration, the policy was calculated at each iteration. This is not
+          normally done for Value Iteration. This will slow down the computation
+          time for Value iteration. To return to traditional value iteration, 
+          comment out the respective lines and remove the appropriate output
     """
     
     # intialize the state-Value function
     V = np.zeros(nS)
+    
+    # intialize a random policy. Comment out for traditional Value_Iteration
+    policy = np.random.randint(0, 4, nS)
+    avg_r_VI_mat = []
+    n_episode = 100
+    
     
     # Iterate over your optimized function, breaking if not changing or difference < tolerance.  
     for i in range(maxiter):
@@ -335,6 +363,13 @@ def value_iteration(env,maxiter):
         # evaluate given policy
         difference, V = Optimum_V(env, prev_V, maxiter, gamma)
         
+        # improve policy. Comment out to return to traditional Value Iteration
+        policy = policy_update(env, policy, V, gamma)
+        
+        #Play episodes based on the current policy. Comment out to return to traditional Value Iteration
+        wins_VI, total_reward_VI, avg_reward_VI = play_episodes(env, n_episode, policy, random = False)
+        avg_r_VI_mat.append(avg_reward_VI)
+    
         
         # if State Value function has not changed over 10 iterations, it has converged.
         if i % 10 == 0:
@@ -354,13 +389,12 @@ def value_iteration(env,maxiter):
     # Update your optimal policy based on optimal value function 'V'
     optimal_policy = policy_update(env, optimal_policy, V, gamma)
 
-    return V, optimal_policy   
-        
+    return V, optimal_policy, avg_r_VI_mat
 
 #%% Run Policy Iteration        
         
 tic = time.time()
-opt_V, opt_policy = policy_iteration(environment, maxiter)
+opt_V, opt_policy, avg_r_PI_mat = policy_iteration(environment, maxiter)
 toc = time.time()
 elapsed_time = (toc - tic) * 1000
 print (f"Time to converge: {elapsed_time: 0.3} ms")
@@ -369,7 +403,7 @@ print(opt_V.reshape((nrow, ncol)))
 print('Final Policy: ')
 print(opt_policy.reshape(nrow,ncol))
 
-#n_episode = 100
+#n_episode = 1000
 #wins_PI, total_reward_PI, avg_reward_PI = play_episodes(environment, n_episode, opt_policy, random = False)
 #print('PI -- Total wins: %d, total reward: %f, Average Reward: %f' %(wins_PI,total_reward_PI,avg_reward_PI))
 
@@ -377,7 +411,7 @@ print(opt_policy.reshape(nrow,ncol))
 #%% Run Value Iteration
 
 tic = time.time()
-opt_V2, opt_policy2 = value_iteration(environment, maxiter)
+opt_V2, opt_policy2, avg_r_VI_mat = value_iteration(environment, maxiter)
 toc = time.time()
 elapsed_time = (toc - tic) * 1000
 print (f"Time to converge: {elapsed_time: 0.3} ms")
@@ -387,6 +421,22 @@ print('Final Policy: ')
 print(opt_policy2.reshape(nrow,ncol))
 
 
-#n_episode = 100
+#n_episode = 1000
 #wins_VI, total_reward_VI, avg_reward_VI = play_episodes(environment, n_episode, opt_policy2, random = False)
 #print('VI -- Total wins: %d, total reward: %f, Average Reward: %f' %(wins_VI,total_reward_VI,avg_reward_VI))
+
+
+#%% Plot average reward
+plt.figure(1)
+plt.plot(range(len(avg_r_PI_mat)), avg_r_PI_mat)
+plt.xlabel('Iteration')
+plt.ylabel('Average Reward')
+plt.title('Policy Iteration - Average Reward over 100 Episodes')
+plt.grid()
+
+plt.figure(2)
+plt.plot(range(len(avg_r_VI_mat)), avg_r_VI_mat)
+plt.xlabel('Iteration')
+plt.ylabel('Average Reward')
+plt.title('Value Iteration - Average Reward over 100 Episodes')
+plt.grid()
