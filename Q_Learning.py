@@ -204,6 +204,7 @@ Qit = np.zeros(int(np.ceil(episodes/hmit)+1))
 
 
 # Training
+avgR = np.zeros(int(episodes/50))
 for i in range(episodes):
     #print("Episode {}/{}".format(i + 1, episodes))
     s = env.reset()
@@ -275,6 +276,25 @@ for i in range(episodes):
         for tile in range(nrow*ncol):
             Qval[-1,tile] = max(Q[tile])
             Qdir[-1,tile] = np.argmax(Q[tile])
+            
+    #Test performance over training iterations
+    if i%50==0:
+       for j in range(100):
+           s = env.reset()
+           done = False
+
+           while not done:
+                a = np.argmax(Q[s])
+                newS, r, done, _ = env.step(a)
+                s = newS
+           avgR[int(i/50)] += r/100.
+
+index = [i for i in range(int(episodes/50))]
+index = np.array(index)*50
+plt.plot(index,avgR)
+plt.xlabel('Iteration')
+plt.ylabel('Average Success Rate')
+plt.title('Q-Learning - Average Success Rate over 100 Episodes')        
                 
 
 print("")
