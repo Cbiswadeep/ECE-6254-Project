@@ -191,10 +191,10 @@ gamma = 0.9
 epsilon = 1.0
 epsilonMin = 0.001
 epsilonDecay = 0.97
-episodes = 10000
-rewardWin = 100
-rewardLose = -100
-rewardMove = -1
+episodes = 6000
+rewardWin = 1
+rewardLose = -1
+rewardMove = 0
 
 # Variables needed to create visualizations
 epsplot = [epsilon]
