@@ -183,15 +183,15 @@ This randomness helps the actor explore new paths rather than getting trapped in
 The epsilon value starts high to encourage exploration but slowly decays each iteration as the specified path should become more clear
 """
 
-# Hyperparameters
+## Hyperparameters
 lr = 0.33
 lrMin = 0.001
 lrDecay = 0.99999
-gamma = 0.9
+gamma = 1.0
 epsilon = 1.0
 epsilonMin = 0.001
 epsilonDecay = 0.97
-episodes = 6000
+episodes = 4000
 rewardWin = 1
 rewardLose = -1
 rewardMove = 0
@@ -206,7 +206,7 @@ Qit = np.zeros(int(np.ceil(episodes/hmit)+1))
 # Training
 avgR = np.zeros(int(episodes/50))
 for i in range(episodes):
-    #print("Episode {}/{}".format(i + 1, episodes))
+    print("Episode {}/{}".format(i + 1, episodes))
     s = env.reset()
     done = False
 
@@ -282,7 +282,6 @@ for i in range(episodes):
        for j in range(100):
            s = env.reset()
            done = False
-
            while not done:
                 a = np.argmax(Q[s])
                 newS, r, done, _ = env.step(a)
