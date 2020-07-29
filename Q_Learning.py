@@ -30,10 +30,13 @@ figdir_eps = os.path.join(cdir,fn_epsilon)  #directory graph image will be saved
 viddir_hm = os.path.join(cdir,fn_heatmap)   #directory heatmap video will be saved to
 
 #%% GENERATE ENVIRONMENT
-# Environment
-custom_map = ['SFFFFFFF', 'FFFFFFFF', 'FFFHFFFF', 'FFFFFHFF', 'FFFHFFFF', 'FHHFFFHF', 'FHFFHFHF', 'FFFHFFFG']  # added by Jason - standard 4x4 map (uncomment for custom map)
-##env = gym.make('FrozenLake-v0', is_slippery=False, desc=custom_map)
 env = gym.make('FrozenLake8x8-v0')
+
+# Environment - uncomment one of these for custom maps (required for animations)
+#custom_map = ['SFFF','FHFH','FFFH','HFFG']  #standard 4x4 map
+custom_map = ['SFFFFFFF', 'FFFFFFFF', 'FFFHFFFF', 'FFFFFHFF', 'FFFHFFFF', 'FHHFFFHF', 'FHFFHFHF', 'FFFHFFFG']  # added by Jason - standard 4x4 map (uncomment for custom map)
+#env = gym.make('FrozenLake-v0', is_slippery=True, desc=custom_map)
+
 print("")
 print('Lake Visualization:')
 print('S=Start, F=Frozen, H=Hole, G=Goal')
@@ -63,8 +66,8 @@ actionsCount = env.action_space.n
       
 #%% DEFINE FUNCTIONS FOR VISUALIZATION
 
-vizit = 250     #number of iterations between path visualizations
-hmit = 5    #numer of iterations between heatmap visualizations
+vizit = 1000     #number of iterations between path visualizations
+hmit = 15    #numer of iterations between heatmap visualizations
 
 def movefun(s0,s1,moves):
     if s1-s0 == -1:         #robot moved left = 0
@@ -122,16 +125,16 @@ def animatepath(j):
         line.set_ydata(y[k:j+1])
         point.set_xdata(x[j])
         point.set_ydata(y[j])
-        plt.title('Iteration %i' %itnum[j])
+        plt.title('Episode %i' %itnum[j])
 
     return line,
 
 def animateheatmap(j):
     plt.cla()
     Val_reshaped = np.reshape(Qval[j,:],(nrow,ncol))
-    p = seaborn.heatmap(Val_reshaped, cmap=cmap, vmin=0, vmax=vmax, cbar=False,
+    p = seaborn.heatmap(Val_reshaped, cmap=cmap, vmin=vmin, vmax=vmax, cbar=False,
                 square=True, xticklabels=ncol+1, yticklabels=nrow+1,
-                linewidths=.5, ax=ax3, annot=True, fmt="f")
+                linewidths=.5, ax=ax3, annot=True, fmt=".3f")
     for i in range(len(lake)):
         for ii in range(len(lake[0])):
             plt.text(i+0.4,ii+0.25,custom_map[ii][i],fontsize=14)
@@ -149,10 +152,9 @@ def animateheatmap(j):
         else:
             plt.text(xk, yk, u'\u2191', fontsize=14)
     
-        plt.title('Iteration %i' %Qit[j])
+        plt.title('Episode %i' %Qit[j])
     
     return p
-######################## END ADDED BY JASON ###################################
 
 #%% TRAIN ROBOT
 # Initialize Q-Table
@@ -206,7 +208,7 @@ Qit = np.zeros(int(np.ceil(episodes/hmit)+1))
 # Training
 avgR = np.zeros(int(episodes/50))
 for i in range(episodes):
-    print("Episode {}/{}".format(i + 1, episodes))
+    #print("Episode {}/{}".format(i + 1, episodes))
     s = env.reset()
     done = False
 
@@ -330,6 +332,8 @@ print('Generating Visuals...')
 #create figure
 plt.figure(1)
 fig1, ax1 = plt.subplots()
+ax1.xaxis.set_ticks([])
+ax1.yaxis.set_ticks([])
 #create lake background
 plt.xlim(0,ncol)
 plt.ylim(0,nrow)
@@ -342,7 +346,7 @@ c = ax1.pcolor(np.linspace(0,ncol,ncol+1),np.linspace(0,nrow,nrow+1),list(lake[:
 x, y = robotloc(moves,0.5,nrow-.5)
 line, = ax1.plot(x[0],y[0],'ko-')
 point, = ax1.plot(x[0],y[0],'r*',markersize=15)
-plt.title('Iteration 0')
+plt.title('Episode 0')
 
 #Reset the counter variables for the animation function.
 # for some reason if j isn't reset, it can get buggy
@@ -364,7 +368,7 @@ fig2 = plt.figure(2)
 plt.plot(np.linspace(1,len(epsplot),len(epsplot)),epsplot)
 plt.plot([1,len(epsplot)],[epsilonMin,epsilonMin],'r--')
 plt.title('Epsilon Value')
-plt.xlabel('Iteration')
+plt.xlabel('Episode')
 plt.ylabel('Epsilon')
 plt.legend(['Epsilon','Threshold'])
 
@@ -375,15 +379,19 @@ plt.show()
 #############################################################################
 #Create evolving Q-dictionary heatmap
 plt.figure(3)   #new figure
-fig3, ax3 = plt.subplots()  #needs to be a subplot to call the axis
+fig3, ax3 = plt.subplots(figsize=(11, 9))  #needs to be a subplot to call the axis
 
 vmax = np.ceil(np.max(Qval)*100)/100    #max value in Qval for upper limit of heatmap color scale
-cmap = seaborn.light_palette((210, 90, 60), input="husl", as_cmap=True) #define colormap
+vmin = np.ceil(np.min(Qval)*100)/100    #min value in Qval for upper limit of heatmap color scale
+vmax = max([abs(vmax),abs(vmin)])       #center the vmax and vmin values so 0=white tile
+vmin = -vmax
+cmap = seaborn.diverging_palette(10, 220, sep=80, as_cmap=True) #define diverging colormap
+#cmap = seaborn.light_palette((210, 90, 60), input="husl", as_cmap=True) #define colormap (not diverging)
 Val_reshaped = np.reshape(Qval[0,:],(nrow,ncol))    #reshape values from Qval into array the size of the lake
 #draw the heatmap
-p = seaborn.heatmap(Val_reshaped, cmap=cmap, vmin=0, vmax=vmax,
+p = seaborn.heatmap(Val_reshaped, cmap=cmap, vmin=vmin, vmax=vmax,
             square=True, xticklabels=ncol+1, yticklabels=nrow+1,
-            linewidths=.5, cbar_kws={"shrink": .5}, ax=ax3, annot=True, fmt="f")
+            linewidths=.5, cbar_kws={"shrink": .5}, ax=ax3, annot=True, fmt=".3f")
 #Add labels to each point on lake (start, hole, frozen, goal)
 for i in range(len(lake)):
     for ii in range(len(lake[0])):
@@ -408,4 +416,3 @@ print('Done')
 # startfile(viddir_path)
 # startfile(figdir_eps)
 # startfile(viddir_hm)
-

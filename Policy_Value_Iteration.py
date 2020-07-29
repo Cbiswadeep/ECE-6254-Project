@@ -9,11 +9,36 @@ import numpy as np
 import time
 import gym
 import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+import matplotlib.animation as animation
+import seaborn
+import os
+from os import startfile
+
+#%% Filepaths for saving videos
+fn_PIvid = 'PI_Heatmap.mp4'     #filename for PI heatmap video
+fn_PIplot = 'PI_Reward.png'     #filename for PI reward graph
+fn_VIvid = 'VI_Heatmap.mp4'     #filename for VI heatmap video
+fn_VIplot = 'VI_Reward.png'     #filename for VI reward graph
+cdir = os.path.abspath(os.getcwd()) #current directory (directory files will be saved to)
+viddir_PI = os.path.join(cdir,fn_PIvid)     #directory PI video will be saved to
+figdir_PI = os.path.join(cdir,fn_PIplot)    #directory PI graph will be saved to
+viddir_VI = os.path.join(cdir,fn_VIvid)     #directory PI video will be saved to
+figdir_VI = os.path.join(cdir,fn_VIplot)    #directory PI graph will be saved to
 
 #%% Initialize arguments and environment
+#Default environment is such that the frozen lake is slippery (i.e. is_slippery = True)
+environment = gym.make('FrozenLake8x8-v0', is_slippery=True)
 
 #Default environment is such that the frozen lake is slippery (i.e. is_slippery = True)
-environment = gym.make('FrozenLake8x8-v0', is_slippery = True)
+#custom_map = ['SFFF','FHFH','FFFH','HFFG']  #standard 4x4 map
+custom_map = ['SFFFFFFF', 'FFFFFFFF', 'FFFHFFFF', 'FFFFFHFF', 'FFFHFFFF', 'FHHFFFHF', 'FHFFHFHF', 'FFFHFFFG'] #standard 8x8 map
+#environment = gym.make('FrozenLake-v0', is_slippery=True, desc=custom_map)
+
+print("")
+print('Lake Visualization:')
+print('S=Start, F=Frozen, H=Hole, G=Goal')
+environment.render()
 
 nA = environment.nA
 nS = environment.nS
@@ -26,7 +51,6 @@ tol = 1e-6
 maxiter = 10000
 
 #%% FrozenLake Environment Important Notes: 
-    
 """
 FrozenLake source code: https://github.com/openai/gym/blob/master/gym/envs/toy_text/frozen_lake.py
 
@@ -39,7 +63,6 @@ Feel free to ask if you're having trouble getting it installed. Some documentati
 
 There are some important functions,dictionaries,variables that I am using from the particular environment
 in Gym that are helpful to know:
-
 1) P[s][a] 
     - Def: A dictionary that for all states and actions, you have FOUR parameters:
            (probability, nextstate, reward, done). See below for explanation of each.
@@ -63,7 +86,6 @@ in Gym that are helpful to know:
         - If directed DOWN: 33% chance of going LEFT, 33% chance of going DOWN, 33% chance of going RIGHT
         - If directed RIGHT: 33% chance of going DOWN, 33% chance of going RIGHT, 33% chance of going UP
 
-
 3) Actions: The actions and subsequent policy that determine your actions are listed below
     - LEFT = 0
     - DOWN = 1
@@ -86,8 +108,6 @@ in Gym that are helpful to know:
     - As mentioned above, the environment defaults to slippery conditions, signifying that 
       you may not go the direction you want to. 
     - This can be turned off by appending 'is_slippery = False' to the gym.make command in line 15
-           
-
 """
 
 #%% Play Episodes
@@ -254,15 +274,22 @@ def policy_iteration(env, maxiter):
             - Your final state_value_function, V(s) 
             - Optimal policy 'pi'
             - Average reward based on 100 episodes
+            - List of all value functions and policies for all iterations (V_hm, P_hm)
     """
     
     # intialize the state-Value function
     V = np.zeros(nS)
+    V_hm = np.copy(V)
+    V_hm.resize((1,V_hm.size))
+    V_hm = V_hm.tolist()
     
     # intialize a random policy
     policy = np.random.randint(0, 4, nS)
     #print(policy)
     policy_prev = np.copy(policy)
+    P_hm = np.copy(policy)
+    P_hm.resize((1,P_hm.size))
+    P_hm = P_hm.tolist()
     
     #Initialize an average reward vector
     avg_r_PI_mat = []
@@ -272,10 +299,17 @@ def policy_iteration(env, maxiter):
         
         # evaluate given policy
         V = policy_evaluation(env, policy, V, gamma, tol, maxiter)
+        # save value function to list for animation
+        V_tmp = np.copy(V)
+        V_tmp = V_tmp.tolist()
+        V_hm.append(V_tmp)
         
         # improve policy
         policy = policy_update(env, policy, V, gamma)
-        
+        # save policy to list for animation
+        P_tmp = np.copy(policy)
+        P_tmp = P_tmp.tolist()
+        P_hm.append(P_tmp)
         
         #Play episodes based on the current policy.
         wins_PI, total_reward_PI, avg_reward_PI = play_episodes(env, n_episode, policy, random = False)
@@ -285,12 +319,13 @@ def policy_iteration(env, maxiter):
         # if policy not changed over 10 iterations it converged.
         if i % 10 == 0:
             if (np.all(np.equal(policy, policy_prev))):
+                print("")
                 print('No Changes for 10 iterations. Policy converged at iteration %d' %(i+1))
                 break
             policy_prev = np.copy(policy)
             
 
-    return V, policy, avg_r_PI_mat
+    return V, policy, avg_r_PI_mat, V_hm, P_hm
             
 
 
@@ -337,6 +372,7 @@ def value_iteration(env,maxiter):
         - Your final state_value_function, V(s) 
         - Optimal policy 'pi'
         - Average reward vector (see note below)
+        - List of all value functions for all iterations
         
     
     NOTE: In order to produce the graph showing average reward over each
@@ -348,6 +384,9 @@ def value_iteration(env,maxiter):
     
     # intialize the state-Value function
     V = np.zeros(nS)
+    V_hm = np.copy(V)
+    V_hm.resize((1,V_hm.size))
+    V_hm = V_hm.tolist()
     
     # intialize a random policy. Comment out for traditional Value_Iteration
     policy = np.random.randint(0, 4, nS)
@@ -370,11 +409,16 @@ def value_iteration(env,maxiter):
         wins_VI, total_reward_VI, avg_reward_VI = play_episodes(env, n_episode, policy, random = False)
         avg_r_VI_mat.append(avg_reward_VI)
     
+        # save value function to list for animation
+        V_tmp = np.copy(V)
+        V_tmp = V_tmp.tolist()
+        V_hm.append(V_tmp)
         
         # if State Value function has not changed over 10 iterations, it has converged.
         if i % 10 == 0:
             # if values of 'V' not changing after one iteration
             if (np.all(np.isclose(V, prev_V))):
+                print("")
                 print('No Changes for 10 iterations. Value converged at iteration %d' %(i+1))
                 break
             
@@ -389,12 +433,12 @@ def value_iteration(env,maxiter):
     # Update your optimal policy based on optimal value function 'V'
     optimal_policy = policy_update(env, optimal_policy, V, gamma)
 
-    return V, optimal_policy, avg_r_VI_mat
+    return V, optimal_policy, avg_r_VI_mat, V_hm
 
 #%% Run Policy Iteration        
         
 tic = time.time()
-opt_V, opt_policy, avg_r_PI_mat = policy_iteration(environment, maxiter)
+opt_V, opt_policy, avg_r_PI_mat, V_PI, P_PI = policy_iteration(environment, maxiter)
 toc = time.time()
 elapsed_time = (toc - tic) * 1000
 print (f"Time to converge: {elapsed_time: 0.3} ms")
@@ -411,7 +455,7 @@ print(opt_policy.reshape(nrow,ncol))
 #%% Run Value Iteration
 
 tic = time.time()
-opt_V2, opt_policy2, avg_r_VI_mat = value_iteration(environment, maxiter)
+opt_V2, opt_policy2, avg_r_VI_mat, V_VI = value_iteration(environment, maxiter)
 toc = time.time()
 elapsed_time = (toc - tic) * 1000
 print (f"Time to converge: {elapsed_time: 0.3} ms")
@@ -419,7 +463,6 @@ print('Optimal Value function: ')
 print(opt_V2.reshape((nrow, ncol)))
 print('Final Policy: ')
 print(opt_policy2.reshape(nrow,ncol))
-
 
 #n_episode = 1000
 #wins_VI, total_reward_VI, avg_reward_VI = play_episodes(environment, n_episode, opt_policy2, random = False)
@@ -440,3 +483,144 @@ plt.xlabel('Iteration')
 plt.ylabel('Average Reward')
 plt.title('Value Iteration - Average Reward over 100 Episodes')
 plt.grid()
+
+#%% Functions to Create Animations
+def animatePIheatmap(j):
+    plt.cla()
+    V_PI_reshaped = np.reshape(np.array(V_PI[j]),(nrow,ncol))
+    p = seaborn.heatmap(V_PI_reshaped, cmap=cmap, vmin=0, vmax=1, cbar=False,
+                square=True, xticklabels=ncol+1, yticklabels=nrow+1,
+                linewidths=.5, ax=ax3, annot=True, fmt=".3f")
+    for i in range(nrow):
+        for ii in range(ncol):
+            plt.text(i+0.4,ii+0.25,custom_map[ii][i],fontsize=14)
+    
+    for k in range(len(P_PI[j])):   #len(P_PI[j]) should equal nrow*ncol
+        xk = (k % ncol) + 0.4
+        yk = (k // nrow) + 0.8
+        arrow = P_PI[j][k]
+        if arrow == 0:
+            plt.text(xk, yk, u'\u2190', fontsize=14)
+        elif arrow == 1:
+            plt.text(xk, yk, u'\u2193', fontsize=14)
+        elif arrow == 2:
+            plt.text(xk, yk, u'\u2192', fontsize=14)
+        else:
+            plt.text(xk, yk, u'\u2191', fontsize=14)
+    
+    plt.title('Iteration %i' %j)
+    
+    return p
+
+
+def animateVIheatmap(j):
+    plt.cla()
+    V_VI_reshaped = np.reshape(np.array(V_VI_small[j]),(nrow,ncol))
+    p = seaborn.heatmap(V_VI_reshaped, cmap=cmap, vmin=0, vmax=1, cbar=False,
+                square=True, xticklabels=ncol+1, yticklabels=nrow+1,
+                linewidths=.5, ax=ax4, annot=True, fmt=".3f")
+    for i in range(nrow):
+        for ii in range(ncol):
+            plt.text(i+0.4,ii+0.25,custom_map[ii][i],fontsize=14)
+    
+    #if j == len(VI_it)-1:
+    for k in range(len(P_VI_small[j])):   #len(P_VI[j]) should equal nrow*ncol
+        xk = (k % ncol) + 0.4
+        yk = (k // nrow) + 0.8
+        arrow = P_VI_small[j][k]
+        if arrow == 0:
+            plt.text(xk, yk, u'\u2190', fontsize=14)
+        elif arrow == 1:
+            plt.text(xk, yk, u'\u2193', fontsize=14)
+        elif arrow == 2:
+            plt.text(xk, yk, u'\u2192', fontsize=14)
+        else:
+            plt.text(xk, yk, u'\u2191', fontsize=14)
+    
+    plt.title('Iteration %i' %int(VI_it[j]))
+    
+    return p
+    
+#%% Create animations
+print("")
+print('Generating Visuals...')
+
+#Create evolving Value Function heatmap for Policy Iteration
+plt.figure(3)   #new figure
+fig3, ax3 = plt.subplots(figsize=(11, 9))  #needs to be a subplot to call the axis
+#cmap = seaborn.diverging_palette(10, 220, sep=80, as_cmap=True) #define diverging colormap
+cmap = seaborn.light_palette((210, 90, 60), input="husl", as_cmap=True) #define colormap (not diverging)
+V_PI_reshaped = np.reshape(np.array(V_PI[0]),(nrow,ncol))    #reshape values from first iteration of V into array the size of the lake
+#draw the heatmap
+p = seaborn.heatmap(V_PI_reshaped, cmap=cmap, vmin=0, vmax=1,
+            square=True, xticklabels=ncol+1, yticklabels=nrow+1,
+            linewidths=.5, cbar_kws={"shrink": .5}, ax=ax3, annot=True, fmt=".3f")
+#Add labels to each point on lake (start, hole, frozen, goal)
+for i in range(nrow):
+    for ii in range(ncol):
+        plt.text(i+0.4,ii+0.2,custom_map[ii][i],fontsize=14)
+    
+#Reset the counter variables for the animation function.
+# for some reason if j isn't reset, it can get buggy       
+j=0
+k=0
+#Create and save Visual #3 (Heatmap video)
+ani = animation.FuncAnimation(fig3, animatePIheatmap, interval=1, save_count=len(V_PI))
+
+plt.rcParams['animation.ffmpeg_path'] ='C:\\Program Files\\Python\\ffmpeg-20200713-7772666-win64-static\\bin\\ffmpeg.exe'
+FFwriter=animation.FFMpegWriter(fps=4, extra_args=['-vcodec', 'libx264'])
+ani.save(fn_PIvid, writer=FFwriter)
+
+plt.show()
+
+#Create evolving Value Function heatmap for Value Iteration
+#since VI has a lot more iterations, this will create an animation where we only
+#   show ever VI_it iteration (if VI_it_gap=5, we will show iterations 0, 5, 10, ..., n)
+VI_it_gap = 5
+
+V_VI_small = [V_VI[0].copy()]
+VI_it = [0]
+P_VI_tmp = policy_update(environment, np.zeros(nS, dtype = 'int8'), np.array(V_VI[0]), gamma)
+P_VI_small = [P_VI_tmp.tolist()]
+for i in range(1,len(V_VI)):
+    if i % VI_it_gap == 0 or i == len(V_VI)-1:
+        V_VI_small.append(V_VI[i])
+        VI_it.append(i)
+        P_VI_tmp = policy_update(environment, np.zeros(nS,dtype = 'int8'),np.array(V_VI[i]),gamma)
+        P_VI_small.append(P_VI_tmp.tolist())
+
+
+plt.figure(4)   #new figure
+fig4, ax4 = plt.subplots(figsize=(11, 9))  #needs to be a subplot to call the axis
+#cmap = seaborn.diverging_palette(10, 220, sep=80, as_cmap=True) #define diverging colormap
+cmap = seaborn.light_palette((210, 90, 60), input="husl", as_cmap=True) #define colormap (not diverging)
+V_VI_reshaped = np.reshape(np.array(V_VI_small[0]),(nrow,ncol))    #reshape values from first iteration of V into array the size of the lake
+#draw the heatmap
+p = seaborn.heatmap(V_VI_reshaped, cmap=cmap, vmin=0, vmax=1,
+            square=True, xticklabels=ncol+1, yticklabels=nrow+1,
+            linewidths=.5, cbar_kws={"shrink": .5}, ax=ax4, annot=True, fmt=".3f")
+#Add labels to each point on lake (start, hole, frozen, goal)
+for i in range(nrow):
+    for ii in range(ncol):
+        plt.text(i+0.4,ii+0.2,custom_map[ii][i],fontsize=14)
+    
+#Reset the counter variables for the animation function.
+# for some reason if j isn't reset, it can get buggy       
+j=0
+k=0
+#Create and save Visual #3 (Heatmap video)
+ani = animation.FuncAnimation(fig4, animateVIheatmap, interval=1, save_count=len(V_VI_small))
+
+plt.rcParams['animation.ffmpeg_path'] ='C:\\Program Files\\Python\\ffmpeg-20200713-7772666-win64-static\\bin\\ffmpeg.exe'
+FFwriter=animation.FFMpegWriter(fps=16, extra_args=['-vcodec', 'libx264'])
+ani.save(fn_VIvid, writer=FFwriter)
+
+plt.show()
+
+print('Done')
+
+#Automatically open visualization files
+# startfile(viddir_PI)
+# startfile(figdir_PI)
+# startfile(viddir_VI)
+# startfile(figdir_VI)
